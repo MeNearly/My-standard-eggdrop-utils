@@ -18,7 +18,7 @@
   variable UTF8_support 1
 
 
-  variable user_agent "Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.2.13) Gecko/20110207 Firefox/3.6.13"
+  variable user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:103.0) Gecko/20100101 Firefox/103.0"
 
   # 
   variable CTCP "\u01"
