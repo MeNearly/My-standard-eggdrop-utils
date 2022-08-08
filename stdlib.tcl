@@ -1,16 +1,16 @@
-  #########################################
-  ## My simple standard tcl Librairy     ##
-  ## (c) 2015-2022 MeNearly@gmail.com    ##
-  ## except uninstall and antiflood      ##
-  ## which are (c) MenzAgitat            ##
-  ##                                     ##
+  ##########################################
+  ## My simple standard tcl Librairy      ##
+  ## (c) 2015-2022 MeNearly@gmail.com     ##
+  ## except uninstall and antiflood       ##
+  ## which are (c) MenzAgitat             ##
+  ##                                      ##
   ## Some utils                           ##
   ## permits support of formatted eggdrop ##
-  ##   commands                          ##
-  ## easy workaround us of utf8 for old  ##
-  ##    versions of eggdrop ( < 1.8.x )  ##
-  ##
-  #########################################
+  ##   commands                           ##
+  ## easy workaround use of utf8 for old  ##
+  ##    versions of eggdrop ( < 1.8.x )   ##
+  ##                                      ##
+  ##########################################
   # md5 pour l'antiflood
   package require md5
 
