@@ -1,16 +1,14 @@
-  ##########################################
-  ## My simple standard tcl Librairy      ##
-  ## (c) 2015-2022 MeNearly@gmail.com     ##
-  ## except uninstall and antiflood       ##
-  ## which are (c) MenzAgitat             ##
-  ##                                      ##
-  ## Some utils                           ##
-  ## permits support of formatted eggdrop ##
-  ##   commands                           ##
-  ## easy workaround use of utf8 for old  ##
-  ##    versions of eggdrop ( < 1.8.x )   ##
-  ##                                      ##
-  ##########################################
+  ###########################################
+  ## My simple standard tcl Librairy       ##
+  ## (c) 2015-2022 MeNearly@gmail.com      ##
+  ## except uninstall and antiflood        ##
+  ## which are (c) MenzAgitat              ##
+  ##                                       ##
+  ## Some utils                            ##
+  ## Support of formatted eggdrop commands ##
+  ##   commands                            ##
+  ## Easy UTF8 correction...               ##
+  ###########################################
   # md5 pour l'antiflood
   package require md5
 
@@ -36,26 +34,33 @@
   variable bold "\u02"
   # 
   variable norm "\u0f"
-  
+
 
   variable allCodes "$bell$under$ital$strike$reverse$bold$norm"
 
   variable pubbindz [::tcl::dict::create]
   variable protectedpubbindz [::tcl::dict::create]
+  variable protectedpubbindz2 [::tcl::dict::create]
   variable msgbindz [::tcl::dict::create]
   variable protectedmsgbindz [::tcl::dict::create]
   variable msglinkedbindz [::tcl::dict::create]
   variable protectedmsglinkedbindz [::tcl::dict::create]
+  variable protectedmsglinkedbindz2 [::tcl::dict::create]
 
-  # before rehash, remove all binds
-  bind evnt -|- prerehash [namespace current]::uninstall
+  # before rehash, remove all binds (must be in a namespace !)
+  if {[namespace current] != "::"} {
+    bind evnt -|- prerehash [namespace current]::uninstall
+  }
   # if you need more specific things, you should do this :
   # unbind evnt -|- prerehash [namespace current]::uninstall
   # bind evnt -|- prerehash [namespace current]::my_specific_uninstall
 
-  proc getvar {name} {
+  proc varexists name {
+    return [info exists [namespace current]::$name]
+  }
+
+  proc getvar name {
     if {![varexists $name]} {
-      #putlog "Trying to get variable `$name`but it does not exist"
       return 0
     }
     namespace upvar [namespace current] $name tmp
@@ -68,29 +73,33 @@
     return $tmp
   }
 
-  proc varexists name {
-    return [info exists [namespace current]::$name]
-  }
-
   proc unsetvar name {
     unset [namespace current]::$name
+  }
+
+  proc incrvar {name {i 1}} {
+    incr [namespace current]::$name $i
   }
 
   # it needs var procs ...
   source "[file dirname [info script]]/colors.tcl"
 
-  # Above are proc to deal with commands containing some control codes (color, bold, etc)
+  # Below are procs to deal with commands containing some control codes (color, bold, etc)
   # set one of pubbinds, protectedpubbindz, etc. as ::tcl::dict { "command_name" "proc_name" ...}
   # Note that proc_name does not need [namespace current]:: !!
   # and then bind them with e.g.
   #   bind pubm - * [namespace current]::filterPubBindz
-  
+
   proc filterPubBindz {nick user handle chan args} {
     return [core_filterPubBindz "pubbindz" $nick $user $handle $chan $args]
   }
 
   proc filterProtectedPubBindz {nick user handle chan args} {
     return [core_filterPubBindz "protectedpubbindz" $nick $user $handle $chan $args]
+  }
+
+  proc filterProtectedPubBindz2 {nick user handle chan args} {
+    return [core_filterPubBindz "protectedpubbindz2" $nick $user $handle $chan $args]
   }
 
   proc filterMsgBindz {nick user handle args} {
@@ -109,20 +118,31 @@
     return [core_filterPubBindz "protectedmsglinkedbindz" $nick $user $handle $nick $args]
   }
 
-  proc stripAllCodes str {
-    return [stripcodes abcgrui $str]
+  proc filterProtectedMsgLinkedBindz2 {nick user handle args} {
+    return [core_filterPubBindz "protectedmsglinkedbindz2" $nick $user $handle $nick $args]
+  }
+
+  proc argsList argument {
+    set argument [string map {\{ "" \} "" \" \\\"} $argument]
+    if {![string is list $argument]} {
+      set argument [split [lindex $argument 0]]
+    }
+    return $argument
   }
 
   proc core_filterPubBindz {bindzNames nick uhost handle chan args} {
     set orig [argsList $args]
-    set args [argsList [stripAllCodes $args]]
+    set args [argsList [stripcodes * $args]]
     set cmd [lindex $args 0]
     set bindz [getvar $bindzNames]
-
     if {! [::tcl::dict::exists $bindz $cmd]} {
       return 1
     }
-    set orig [lreplace $orig 0 [lsearch $orig $cmd]]
+    set i [lsearch $orig $cmd]
+    if {$i==-1} {
+      set i 0
+    }
+    set orig [lreplace $orig 0 $i]
     set procz [::tcl::dict::get $bindz $cmd]
     if {$procz != ""} {
       return [$procz $nick $uhost $handle $chan $orig]
@@ -132,13 +152,17 @@
 
   proc core_filterMsgBindz {bindzNames nick user handle args} {
     set orig [argsList $args]
-    set args [argsList [stripAllCodes $args]]
+    set args [argsList [stripcodes * $args]]
     set cmd [lindex $args 0]
     set bindz [getvar $bindzNames]
     if {! [::tcl::dict::exists $bindz $cmd]} {
       return 1
     }
-    set orig [lreplace $orig 0 [lsearch $orig $cmd]]
+    set i [lsearch $orig $cmd]
+    if {$i==-1} {
+      set i 0
+    }
+    set orig [lreplace $orig 0 $i]
 
     set procz [::tcl::dict::get $bindz $cmd]
     if {$procz != ""} {
@@ -190,14 +214,6 @@
     return [encoding convertto unicode $str]
   }
 
-  proc argsList argument {
-    set argument [string map {\{ "" \} "" \" \\\"} $argument]
-    if {![string is list $argument]} {
-      set argument [split [lindex $argument 0]]
-    }
-    return $argument
-  }
-
   proc notice {nick line} {
     gen_notice putserv "-normal" $nick $line
   }
@@ -215,19 +231,19 @@
     set i 0
     if { $line != "" } {
       if {[string length $line] > 450} {
-          set text "//"
-          while {$text != "" } {
-            set splitted [split_line $line $i]
-            set text [lindex $splitted 1]
-            if {$text != ""} {
-              if { $arg == "" } {
-                $put_type "notice $nick :$text"
-              } else {
-                $put_type "notice $nick :$text" $arg
-              }
+        set text "//"
+        while {$text != "" } {
+          set splitted [split_line $line $i]
+          set text [lindex $splitted 1]
+          if {$text != ""} {
+            if { $arg == "" } {
+              $put_type "notice $nick :$text"
+            } else {
+              $put_type "notice $nick :$text" $arg
             }
-            set i [lindex $splitted 0]
           }
+          set i [lindex $splitted 0]
+        }
       } else {
         if { $arg == "" } {
           $put_type "notice $nick :$line"
@@ -247,18 +263,18 @@
     set i 0
     if { $line != "" } {
       if {[string length $line] > 400} {
-          set text "//"
-          while {$text != "" } {
-            set splitted [split_line $line $i]
-            set text [lindex $splitted 1]
-            if {$text != ""} {
-              putquick "notice $to :$text"
-              if {[strlwr "$to"] ne [strlwr "$nick"]} {
-                putquick "notice $nick :$text"
-              }
+        set text "//"
+        while {$text != "" } {
+          set splitted [split_line $line $i]
+          set text [lindex $splitted 1]
+          if {$text != ""} {
+            putquick "notice $to :$text"
+            if {[strlwr "$to"] ne [strlwr "$nick"]} {
+              putquick "notice $nick :$text"
             }
-            set i [lindex $splitted 0]
           }
+          set i [lindex $splitted 0]
+        }
       } else {
         putquick "notice $to :$line"
         if {[strlwr "$to"] ne [strlwr "$nick"]} {
@@ -296,6 +312,11 @@
     return [expr [string first $char [getvar allCodes]] > -1];
   }
 
+  proc stripAllCodes arg {
+    set arg [string map { "\xa0" " "} $arg]
+    return [stripcodes * $arg]
+  }
+
   proc split_line {line start} {
     set end [expr $start + 399]
     set tmp [string range $line $start $end]
@@ -310,15 +331,18 @@
     set i 0
     if { $line != "" } {
       if {[string length $line] > 400} {
-          set text "//"
-          while {$text != "" } {
-            set splitted [split_line $line $i]
-            set text [lindex $splitted 1]
-            if {$text != ""} {
-              $put_type "privmsg $chan :$text"
+        set text "//"
+        while {$text != "" } {
+          set splitted [split_line $line $i]
+          set i [lindex $splitted 0]
+          set text [lindex $splitted 1]
+          if {$text != ""} {
+            if {[expr [string length $splitted] + [string length [string range $line $i end]]] < 400} {
+              set text "$text[string range $line $i end]"
             }
-            set i [lindex $splitted 0]
+            $put_type "privmsg $chan :$text"
           }
+        }
       } else {
         $put_type "privmsg $chan :$line"
       }
@@ -326,16 +350,39 @@
   }
 
   proc noAccent {str} {
-    set str [utf8From $str]
-    set str [string map { À A Â A Ä A Ã A Ç C É E È E Ê E Ë E Ï I Î I Ñ N Ö O Ô O Õ O Ù U Û U Ü U } $str]
-    set str [string map { à a â a ä a ã a ç c é e è e ê e ë e ï i î i ñ n ö o ô o õ o ù u û u ü u } $str]
+    set str $str
+    set str [string map [utf8 [list À A Â A Ä A Ã A Ç C É E È E Ê E Ë E Ï I Î I Ñ N Ö O Ô O Õ O Ù U Û U Ü U]] $str]
+    set str [string map [utf8 [list à a â a ä a ã a ç c é e è e ê e ë e ï i î i ñ n ö o ô o õ o ù u û u ü u]] $str]
     return $str
   }
 
-  # this is obvioulsy incomplete !!
+  proc littleCaps {str} {
+    set rez [string map {a ᴀ b ʙ c ᴄ d ᴅ e ᴇ f ғ g ɢ h ʜ i ɪ j ᴊ k ᴋ l ʟ m ᴍ n ɴ o ᴏ p ᴘ q ǫ r ʀ s s t ᴛ u ᴜ v ᴠ w ᴡ x x y ʏ z ᴢ } [noAccent $str]]
+    return $rez
+  }
+
+  proc ue_init {} {
+     lappend d + { }
+     for {set i 0} {$i < 256} {incr i} {
+        set c [format %c $i]
+        set x %[format %02x $i]
+        if {![string match {[a-zA-Z0-9]} $c]} {
+           lappend e $c $x
+           lappend d $x $c
+        }
+     }
+     set ::ue_map $e
+     set ::ud_map $d
+  }
+
+  proc uencode {s} { string map $::ue_map $s }
+  proc udecode {s} { string map $::ud_map $s }
+
+  # this is quite complete
   proc htmlEntities str {
-    return [::tcl::string::map {
-      "&agrave;"    "à"    "&agrave;"    "à"    "&aacute;"    "á"    "&acirc;"      "â"
+  # html 'normal' entities
+    set tmp [::tcl::string::map {
+      "&agrave;"    "à"    "&aacute;"    "á"    "&acirc;"      "â"
       "&atilde;"    "ã"    "&auml;"      "ä"    "&aring;"      "å"    "&aelig;"      "æ"
       "&ccedil;"    "ç"    "&egrave;"    "è"    "&eacute;"    "é"    "&ecirc;"      "ê"
       "&euml;"      "ë"    "&igrave;"    "ì"    "&iacute;"    "í"    "&icirc;"      "î"
@@ -362,30 +409,65 @@
       "&Ouml;"      "Ö"    "&times;"      "×"    "&Oslash;"    "Ø"    "&Ugrave;"    "Ù"
       "&Uacute;"    "Ú"    "&Ucirc;"      "Û"    "&Uuml;"      "Ü"    "&Yacute;"    "Ý"
       "&THORN;"      "Þ"    "&szlig;"      "ß"    "\r"          "\n"  "\t"          ""
-      "&#039;"      "\'"  "&#39;"        "\'"  "&nbsp;"      " "    "&nbsp"        " "
-      "&#34;"        "\'"  "&#38;"        "&"    "#91;"        "\("  "&#92;"        "/"
-      "&#93;"        ")"    "&#123;"      "("    "&#125;"      ")"    "&#163;"      "£"
-      "&#168;"      "¨"    "&#169;"      "©"    "&#171;"      "«"    "&#173;"      "­"
-      "&#174;"      "®"    "&#180;"      "´"    "&#183;"      "·"    "&#185;"      "¹"
-      "&#187;"      "»"    "&#188;"      "¼"    "&#189;"      "½"    "&#190;"      "¾"
-      "&#192;"      "À"    "&#193;"      "Á"    "&#194;"      "Â"    "&#195;"      "Ã"
-      "&#196;"      "Ä"    "&#197;"      "Å"    "&#198;"      "Æ"    "&#199;"      "Ç"
-      "&#200;"      "È"    "&#201;"      "É"    "&#202;"      "Ê"    "&#203;"      "Ë"
-      "&#204;"      "Ì"    "&#205;"      "Í"    "&#206;"      "Î"    "&#207;"      "Ï"
-      "&#208;"      "Ð"    "&#209;"      "Ñ"    "&#210;"      "Ò"    "&#211;"      "Ó"
-      "&#212;"      "Ô"    "&#213;"      "Õ"    "&#214;"      "Ö"    "&#215;"      "×"
-      "&#216;"      "Ø"    "&#217;"      "Ù"    "&#218;"      "Ú"    "&#219;"      "Û"
-      "&#220;"      "Ü"    "&#221;"      "Ý"    "&#222;"      "Þ"    "&#223;"      "ß"
-      "&#224;"      "à"    "&#225;"      "á"    "&#226;"      "â"    "&#227;"      "ã"
-      "&#228;"      "ä"    "&#229;"      "å"    "&#230;"      "æ"    "&#231;"      "ç"
-      "&#232;"      "è"    "&#233;"      "é"    "&#234;"      "ê"    "&#235;"      "ë"
-      "&#236;"      "ì"    "&#237;"      "í"    "&#238;"      "î"    "&#239;"      "ï"
-      "&#240;"      "ð"    "&#241;"      "ñ"    "&#242;"      "ò"    "&#243;"      "ó"
-      "&#244;"      "ô"    "&#245;"      "õ"    "&#246;"      "ö"    "&#247;"      "÷"
-      "&#248;"      "ø"    "&#249;"      "ù"    "&#250;"      "ú"    "&#251;"      "û"
-      "&#252;"      "ü"    "&#253;"      "ý"    "&#254;"      "þ"    "&#9830;"      ""
-      "&lt;"        "<"    "&gt;"        ">"    "&#47;"        "/"    "&#33;"        "!"
-    } $data]
+      "&nbsp;"      " " "&apos;" "'" "&gt;" ">" "&lt;" "<"} $str]
+# html decimal codes
+    set re {&#([0-9]{2,3})}
+    set decChars [regexp -all -inline -nocase $re $tmp]
+    set mapL {}
+    foreach {code value} $decChars {
+      set c [format %c [scan $value %d]]
+      lappend mapL "&#$value;"
+      lappend mapL $c
+    }
+    set tmp [string map -nocase $mapL $tmp]
+
+# html hexadecimal codes
+    set re {&#x([a-f0-9]{2})}
+    set hexChars [regexp -all -inline -nocase $re $tmp]
+    set mapL {}
+    foreach {code value} $hexChars {
+      scan $value %x val
+      set c [format %c $val]
+      lappend mapL "&#x$value;"
+      lappend mapL $c
+    }
+    set tmp [string map -nocase $mapL $tmp]
+
+    return $tmp
+  }
+
+  proc urldecode str {
+    # rewrite "+" back to space
+    # protect \ from quoting another '\'
+    set str [string map [list + { } "\\" "\\\\"] $str]
+
+    # prepare to process all %-escapes
+    regsub -all -- {%([A-Fa-f0-9][A-Fa-f0-9])} $str {\\u00\1} str
+
+    # process \u unicode mapped chars
+    return [subst -novar -nocommand $str]
+  }
+
+  proc html_entities_encode {data} {
+    return [::tcl::string::map [lreverse [getvar entities]] $data]
+  }
+
+  proc html_hexdec_decode {data} {
+    regsub -all {&#([[:digit:]]{1,5});} $data {[format %c [string trimleft "\1" "0"]]} data
+    regsub -all {&#x([[:xdigit:]]{1,4});} $data {[format %c [scan "\1" %x]]} data
+    return [subst $data]
+  }
+
+  proc duration int_time {
+    set timeList [list]
+    foreach div {86400 3600 60 1} mod {0 24 60 60} name {jour heure minute seconde} {
+      set n [expr {$int_time / $div}]
+      if {$mod > 0} {set n [expr {$n % $mod}]}
+      if {$n > 0} {
+        lappend timeList "$n ${name}[expr $n>1?{s}:{}]"
+      }
+    }
+    return [join $timeList]
   }
 
   # usefull for some letter-games and some keyboards
@@ -405,14 +487,14 @@
     if {![info exists [namespace current]::owner] || ![info exists [namespace current]::allowed] || ![info exists [namespace current]::protected]} {
       return 1
     }
-    if {[string match [getvar owner] $uhost]} { return 1}
+    if {[string match -nocase [getvar owner] $uhost]} { return 1}
 
-    set is_protected [lsearch [getvar protected] $name]
+    set is_protected [lsearch -nocase [getvar protected] $name]
     if {$is_protected == -1} {
       return 1
     } else {
       foreach mask [getvar allowed] {
-        if {[string match $mask $uhost]} {
+        if {[string match -nocase $mask $uhost]} {
           return 1
         }
       }
@@ -451,6 +533,22 @@
     return $on
   }
 
+  ##########################
+  ## Inversion dict
+  ##########################
+
+  proc inverse_dict dico {
+    ## PERMET D'INVERSER L'ASSOCIATION dans un dictionnaire
+    ## n'est pas stocké, mais simplifie la visualisation ou recherche
+    set tmp_dict [::tcl::dict::create]
+    ::tcl::dict::for {key list1} $dico {
+      foreach value $list1 {
+        ::tcl::dict::lappend tmp_dict $value $key
+      }
+    }
+    return $tmp_dict
+  }
+
   ###########################################
   # Désinstallation/suppression du namespace
   # et suppression des [u]timers
@@ -480,7 +578,7 @@
   ###   antiflood_msg = 2 : message "antiflood déclenché" déjà affiché
   ###############################################################################
 # Activer le contrôle de flood ? (0 = non / 1 = oui)
-  variable antiflood 1
+  variable antiflood true
 
 # Seuil de déclenchement de l'antiflood.
 # Exemple : "4:180" = 4 commandes maximum en 180 secondes; les suivantes
@@ -550,4 +648,5 @@
     return
   }
 #END ANTIFLOOD
+  ue_init
 
