@@ -58,7 +58,7 @@
   variable colors {white black blue green red brown purple orange yellow lightgreen cyan lightcyan lightblue pink grey lightgrey}
 
   foreach colorname $colors {
-    variable ${colorname}_back ",[getvar $colorname]"
+    variable ${colorname}_back ",$colorname"
   }
 
 
