@@ -365,6 +365,7 @@
 
   proc gen_broadcast {put_type chan line} {
     set i 0
+    set next false
     if { $line != "" } {
       if {[string length $line] > 400} {
         set text "//"
@@ -376,7 +377,11 @@
             if {[expr [string length $splitted] + [string length [string range $line $i end]]] < 400} {
               set text "$text[string range $line $i end]"
             }
+            if {$next} {
+              set text [strtrim $text]
+            }
             $put_type "privmsg $chan :$text"
+            set next true
           }
         }
       } else {

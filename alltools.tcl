@@ -68,6 +68,9 @@
 # stridx <string> <index>
 #   string index
 #
+# strtrim <string>
+#   string trim
+#
 # iscommand <command>
 #   if the given command exists, return 1
 #   else return 0
@@ -207,6 +210,11 @@ proc strlen {string} {
 
 proc stridx {string index} {
   string index $string $index
+}
+
+# ksynet
+proc strtrim string {
+  string trim "$string"
 }
 
 proc iscommand {command} {
