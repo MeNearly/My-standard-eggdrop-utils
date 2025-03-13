@@ -1,40 +1,46 @@
   ###########################################
-  ## My simple standard tcl Librairy       ##
-  ## (c) V1.2 2015-202x MeNearly@gmail.com ##
+  ## My simple standard tcl Library        ##
+  ## v1.3 © 015-202x MeNearly@gmail.com    ##
   ## except uninstall and antiflood        ##
-  ## which are (c) MenzAgitat              ##
+  ## which are © MenzAgitat                ##
   ##                                       ##
   ## Some utils                            ##
   ## Support of formatted eggdrop commands ##
-  ##   commands                            ##
-  ## Easy UTF8 correction...               ##
+  ##                                       ##
+  ## DEPRECATED since eggdrop1.10/tcl9 :   ##
+  ##    Easy UTF8 correction...            ##
   ## extended HTML entities parsing        ##
   ###########################################
   # md5 pour l'antiflood
   package require md5
 
-  variable DEBUGMODE 0
-  variable UTF8_support 1
+  variable DEBUGMODE false
+  # DEPRECATED
+  variable UTF8_support false
 
-  variable stdlibversion "v1.2 ©2015-2024"
+  if { "$::tcl_version" >= "9.0" } {
+    set UTF8_support true
+  }
+
+  variable stdlibversion "v1.3 ©2015-202x"
   variable user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:103.0) Gecko/20100101 Firefox/103.0"
   variable useragent $user_agent
   # 
-  variable CTCP "\u01"
+  variable CTCP "\x01"
 
-  variable bell "\007"
+  variable bell "\x07"
   # 
-  variable under "\u1f"
+  variable under "\x1f"
   # 
-  variable ital "\u1d"
+  variable ital "\x1d"
   # 
-  variable strike "\u1e"
+  variable strike "\x1e"
   # 
-  variable reverse "\u16"
+  variable reverse "\x16"
   # 
-  variable bold "\u02"
+  variable bold "\x02"
   # 
-  variable norm "\u0f"
+  variable norm "\x0f"
 
   variable allCodes "$bell$under$ital$strike$reverse$bold$norm"
 
@@ -174,7 +180,17 @@
     set orig [lreplace $orig 0 $i]
     set procz [::tcl::dict::get $bindz $cmd]
     if {$procz != ""} {
-      return [$procz $nick $uhost $handle $chan $orig]
+      if {[catch {set rez [$procz $nick $uhost $handle $chan $orig]} rc infos]} {
+        notice_quick $nick [utf8 "[getvar color][getvar red][getvar bold]ERROR : [getvar bold][getvar ital][::tcl::dict::get $infos -errorinfo][getvar norm]"]
+        if [getvar DEBUGMODE] {
+          foreach line [split [::tcl::dict::get $infos -errorstack] "\n"] {
+            notice_quick $nick [utf8 "[getvar color][getvar red][getvar bold]$line[getvar norm]"]
+          }
+        }
+        return 1
+      } else {
+        return $rez
+      }
     }
     return 1
   }
@@ -195,7 +211,17 @@
 
     set procz [::tcl::dict::get $bindz $cmd]
     if {$procz != ""} {
-      return [$procz $nick $user $handle $orig]
+      if {[catch {set rez [$procz $nick $uhost $handle $chan $orig]} rc infos]} {
+        notice_quick $nick [utf8 "[getvar color][getvar red][getvar bold]ERROR : [getvar bold][getvar ital][::tcl::dict::get $infos -errorinfo][getvar norm]"]
+        if [getvar DEBUGMODE] {
+          foreach line [split [::tcl::dict::get $infos -errorstack] "\n"] {
+            notice_quick $nick [utf8 "[getvar color][getvar red][getvar bold]$line[getvar norm]"]
+          }
+        }
+        return 1
+      } else {
+        return $rez
+      }
     }
     return 1
   }
@@ -211,6 +237,7 @@
     return 0
   }
 
+  # DEPRECATED
   proc utf8 {str} {
     if {[getvar UTF8_support]} {
       return $str
@@ -219,6 +246,7 @@
     }
   }
 
+  # DEPRECATED
   proc utf8From {str} {
     if {[getvar UTF8_support]} {
       return $str
@@ -646,14 +674,14 @@
     if { [getvar instance($cmd_hash)] >= [getvar max_instances] } {
       if { ![getvar antiflood_msg($cmd_hash)] } {
         setvar antiflood_msg($cmd_hash) 2
-        broadcast $chan [utf8 "\00304:::\003 \00314Contrôle de flood activé pour \002$cmd\002 : pas plus de [getvar max_instances] requête(s) toutes les [getvar instance_length] secondes.\003"]
+        broadcast $chan [utf8 "\x0304:::\x03 \x0314Contrôle de flood activé pour \x02$cmd\x02 : pas plus de [getvar max_instances] requête(s) toutes les [getvar instance_length] secondes.\x03"]
         if { [set msgresettimer [utimerexists "antiflood_msg_reset $cmd_hash"]] ne ""} {
           killutimer $msgresettimer
         }
         utimer [getvar antiflood_msg_interval] [list [namespace current]::antiflood_msg_reset $cmd_hash]
       } elseif { [getvar antiflood_msg($cmd_hash)] == 1 } {
         setvar antiflood_msg($cmd_hash) 2
-        broadcast $chan [utf8 "\00304:::\003 \00314Le contrôle de flood est toujours actif, merci de patienter.\003"]
+        broadcast $chan [utf8 "\x0304:::\x03 \x0314Le contrôle de flood est toujours actif, merci de patienter.\x03"]
         if { [set msgresettimer [utimerexists "antiflood_msg_reset $cmd_hash"]] ne ""} {
           killutimer $msgresettimer
         }
@@ -691,5 +719,3 @@
   }
 #END ANTIFLOOD
   ue_init
-
-putlog "stdlib $stdlibversion chargé"
